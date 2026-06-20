@@ -9,9 +9,9 @@ import {
   Bike,
   Menu,
   X,
-  Bell,
 } from 'lucide-react';
 import { cn } from '@/utils';
+import NotificationBell from './NotificationBell';
 
 const navItems = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
@@ -121,10 +121,7 @@ export default function Layout({ children }: LayoutProps) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

@@ -62,4 +62,19 @@ export interface LoadBalanceResult {
   reason: string;
 }
 
+export type NotificationType = 'pickup' | 'low_stock' | 'system';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  ticketId?: string;
+  stationId?: string;
+  customerName?: string;
+  bikeModel?: string;
+  read: boolean;
+  createdAt: Date;
+}
+
 export type TabKey = 'dashboard' | 'queue' | 'dispatch' | 'parts' | 'outbound';

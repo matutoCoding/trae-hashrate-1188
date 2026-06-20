@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Package,
   Search,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { usePartStore } from '@/stores/partStore';
 import { useOutboundStore } from '@/stores/outboundStore';
+import { useUIStore } from '@/stores/uiStore';
 import {
   formatDate,
   calculateLoadPercentage,
@@ -22,6 +24,7 @@ import {
 } from '@/utils';
 
 export default function PartsManagement() {
+  const navigate = useNavigate();
   const {
     batches,
     getCategories,
@@ -29,6 +32,7 @@ export default function PartsManagement() {
     getLowStockBatches,
   } = usePartStore();
   const { getTotalOutboundQuantity, getRecordsByBatch } = useOutboundStore();
+  const { setPreselectedBatchId } = useUIStore();
 
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -481,7 +485,16 @@ export default function PartsManagement() {
                     >
                       关闭
                     </button>
-                    <button className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/25">
+                    <button
+                      onClick={() => {
+                        if (selectedBatch) {
+                          setPreselectedBatchId(selectedBatch);
+                          setSelectedBatch(null);
+                          navigate('/outbound');
+                        }
+                      }}
+                      className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/25"
+                    >
                       拆分出库
                     </button>
                   </div>

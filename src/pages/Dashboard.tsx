@@ -8,11 +8,15 @@ import {
   AlertTriangle,
   ArrowRight,
   Ticket,
+  Car,
+  Check,
+  Bike,
 } from 'lucide-react';
 import { useQueueStore } from '@/stores/queueStore';
 import { useStationStore } from '@/stores/stationStore';
 import { usePartStore } from '@/stores/partStore';
 import { useOutboundStore } from '@/stores/outboundStore';
+import { useNotificationStore } from '@/stores/notificationStore';
 import {
   getStatusColor,
   getStatusLabel,
@@ -23,11 +27,17 @@ import {
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
-  const { getTodayStats, getCallingTickets, getServicingTickets } =
-    useQueueStore();
+  const {
+    getTodayStats,
+    getCallingTickets,
+    getServicingTickets,
+    getReadyForPickupTickets,
+    pickupTicket,
+  } = useQueueStore();
   const { stations, getAvailableStations } = useStationStore();
   const { getLowStockBatches, batches } = usePartStore();
   const { getTodayOutboundCount, getRecentRecords } = useOutboundStore();
+  const { getUnreadCount, markAsRead, notifications } = useNotificationStore();
 
   const stats = getTodayStats();
   const lowStockBatches = getLowStockBatches(30);
@@ -67,8 +77,98 @@ export default function Dashboard() {
     },
   ];
 
+  const readyForPickupTickets = getReadyForPickupTickets();
+  const unreadCount = getUnreadCount();
+  const unreadPickupNotifications = notifications.filter(
+    (n) => n.type === 'pickup' && !n.read
+  );
+
+  const handlePickup = (ticketId: string, notificationId: string) => {
+    pickupTicket(ticketId);
+    markAsRead(notificationId);
+  };
+
   return (
     <div className="space-y-6">
+      {unreadPickupNotifications.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <Car className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-800">
+                  待取车提醒
+                </h3>
+                <p className="text-sm text-amber-600">
+                  {unreadPickupNotifications.length} 辆车已完成维修，等待车主取车
+                </p>
+              </div>
+            </div>
+            {unreadPickupNotifications.length > 0 && (
+              <span className="px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded-full">
+                {unreadPickupNotifications.length} 条未读
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {unreadPickupNotifications.slice(0, 3).map((notification) => {
+              const station = notification.stationId
+                ? stations.find((s) => s.id === notification.stationId)
+                : null;
+              return (
+                <div
+                  key={notification.id}
+                  className="bg-white rounded-xl p-4 border border-amber-100 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+                      <Bike className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-800">
+                          {notification.customerName}
+                        </span>
+                        <span className="text-sm text-slate-500">
+                          {notification.bikeModel}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Wrench className="w-3.5 h-3.5" />
+                          {station?.name || '未知工位'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {formatTime(notification.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {notification.ticketId && (
+                    <button
+                      onClick={() =>
+                        handlePickup(
+                          notification.ticketId!,
+                          notification.id
+                        )
+                      }
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium transition-colors shadow-lg shadow-amber-500/25"
+                    >
+                      <Check className="w-4 h-4" />
+                      确认取车
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, index) => {
           const Icon = card.icon;

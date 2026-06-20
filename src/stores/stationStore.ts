@@ -8,12 +8,16 @@ interface StationState {
   setStations: (stations: RepairStation[]) => void;
   updateStationStatus: (id: string, status: StationStatus) => void;
   updateStationLoad: (id: string, load: number) => void;
+  updateWaitingCount: (id: string, count: number) => void;
   incrementCompleted: (id: string) => void;
   getStationById: (id: string) => RepairStation | undefined;
   getAvailableStations: () => RepairStation[];
-  calculateLoadBalance: (estimatedMinutes?: number) => LoadBalanceResult;
+  calculateLoadBalance: (
+    estimatedMinutes?: number,
+    excludeStationId?: string
+  ) => LoadBalanceResult;
   getTotalWaiting: () => number;
-  reassignTicket: (ticketId: string, fromStationId: string, toStationId: string) => void;
+  recalculateAllWaitingCounts: (getWaitingCountByStation: (stationId: string) => number) => void;
 }
 
 export const useStationStore = create<StationState>()(
@@ -37,6 +41,13 @@ export const useStationStore = create<StationState>()(
           ),
         })),
 
+      updateWaitingCount: (id, count) =>
+        set((state) => ({
+          stations: state.stations.map((s) =>
+            s.id === id ? { ...s, waitingCount: count } : s
+          ),
+        })),
+
       incrementCompleted: (id) =>
         set((state) => ({
           stations: state.stations.map((s) =>
@@ -51,8 +62,11 @@ export const useStationStore = create<StationState>()(
       getAvailableStations: () =>
         get().stations.filter((s) => s.status !== 'offline'),
 
-      calculateLoadBalance: (estimatedMinutes = 30) => {
-        const availableStations = get().getAvailableStations();
+      calculateLoadBalance: (estimatedMinutes = 30, excludeStationId) => {
+        const availableStations = get()
+          .getAvailableStations()
+          .filter((s) => s.id !== excludeStationId);
+
         if (availableStations.length === 0) {
           return { stationId: '', score: 0, reason: '暂无可用工位' };
         }
@@ -63,11 +77,12 @@ export const useStationStore = create<StationState>()(
 
         for (const station of availableStations) {
           const loadScore = 100 - station.currentLoad;
-          const waitingScore = station.waitingCount * -10;
+          const waitingScore = station.waitingCount * -15;
           const speedScore = (60 - station.avgServiceTime) * 0.5;
-          const statusBonus = station.status === 'idle' ? 30 : 0;
+          const statusBonus = station.status === 'idle' ? 40 : 0;
+          const estimatedTimeBonus = estimatedMinutes < station.avgServiceTime ? 10 : 0;
           const totalScore =
-            loadScore + waitingScore + speedScore + statusBonus;
+            loadScore + waitingScore + speedScore + statusBonus + estimatedTimeBonus;
 
           if (totalScore > bestScore) {
             bestScore = totalScore;
@@ -76,7 +91,9 @@ export const useStationStore = create<StationState>()(
             const reasons = [];
             if (station.status === 'idle') reasons.push('当前空闲');
             if (station.waitingCount === 0) reasons.push('无人等待');
+            else if (station.waitingCount === 1) reasons.push('仅1人等待');
             if (station.avgServiceTime < 30) reasons.push('效率高');
+            if (station.currentLoad < 30) reasons.push('负载低');
             bestReason = reasons.join('、') || '综合评分最高';
           }
         }
@@ -91,17 +108,12 @@ export const useStationStore = create<StationState>()(
       getTotalWaiting: () =>
         get().stations.reduce((sum, s) => sum + s.waitingCount, 0),
 
-      reassignTicket: (_ticketId, fromStationId, toStationId) => {
+      recalculateAllWaitingCounts: (getWaitingCountByStation) => {
         set((state) => ({
-          stations: state.stations.map((s) => {
-            if (s.id === fromStationId) {
-              return { ...s, waitingCount: Math.max(0, s.waitingCount - 1) };
-            }
-            if (s.id === toStationId) {
-              return { ...s, waitingCount: s.waitingCount + 1 };
-            }
-            return s;
-          }),
+          stations: state.stations.map((s) => ({
+            ...s,
+            waitingCount: getWaitingCountByStation(s.id),
+          })),
         }));
       },
     }),

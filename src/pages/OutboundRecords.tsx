@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   Plus,
@@ -13,10 +14,12 @@ import {
   ArrowRight,
   PieChart,
   List,
+  ArrowLeft,
 } from 'lucide-react';
 import { useOutboundStore } from '@/stores/outboundStore';
 import { usePartStore } from '@/stores/partStore';
 import { useStationStore } from '@/stores/stationStore';
+import { useUIStore } from '@/stores/uiStore';
 import {
   formatDateTime,
   cn,
@@ -24,6 +27,7 @@ import {
 import type { OutboundRecord } from '@/types';
 
 export default function OutboundRecords() {
+  const navigate = useNavigate();
   const {
     records,
     addRecord,
@@ -33,11 +37,13 @@ export default function OutboundRecords() {
   } = useOutboundStore();
   const { batches, getBatchById } = usePartStore();
   const { stations } = useStationStore();
+  const { preselectedBatchId, clearPreselectedBatchId } = useUIStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filterBatch, setFilterBatch] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'list' | 'distribution'>('list');
+  const [returnToBatchId, setReturnToBatchId] = useState<string | null>(null);
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -48,6 +54,15 @@ export default function OutboundRecords() {
     remark: '',
     stationId: '',
   });
+
+  useEffect(() => {
+    if (preselectedBatchId) {
+      setFormData((prev) => ({ ...prev, batchId: preselectedBatchId }));
+      setReturnToBatchId(preselectedBatchId);
+      setShowAddModal(true);
+      clearPreselectedBatchId();
+    }
+  }, [preselectedBatchId, clearPreselectedBatchId]);
 
   const filteredRecords = () => {
     let result = records;
@@ -84,6 +99,11 @@ export default function OutboundRecords() {
 
     if (result) {
       setShowAddModal(false);
+
+      if (returnToBatchId) {
+        setReturnToBatchId(null);
+      }
+
       setFormData({
         batchId: '',
         quantity: 1,
@@ -114,6 +134,35 @@ export default function OutboundRecords() {
 
   return (
     <div className="space-y-6">
+      {returnToBatchId && (
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+              <Package className="w-4 h-4 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-teal-800">
+                正在从批次详情出库
+              </p>
+              <p className="text-xs text-teal-600">
+                {getBatchById(returnToBatchId)?.partName} (
+                {getBatchById(returnToBatchId)?.batchNumber})
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setReturnToBatchId(null);
+              navigate('/parts');
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-teal-700 hover:bg-teal-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            返回批次详情
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">出库记录</h2>
@@ -581,24 +630,51 @@ export default function OutboundRecords() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              {returnToBatchId ? (
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setReturnToBatchId(null);
+                    setFormData({
+                      batchId: '',
+                      quantity: 1,
+                      destination: '',
+                      operator: '',
+                      remark: '',
+                      stationId: '',
+                    });
+                    navigate('/parts');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  返回详情
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setFormData({
+                      batchId: '',
+                      quantity: 1,
+                      destination: '',
+                      operator: '',
+                      remark: '',
+                      stationId: '',
+                    });
+                  }}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                >
+                  取消
+                </button>
+              )}
               <button
                 onClick={() => {
-                  setShowAddModal(false);
-                  setFormData({
-                    batchId: '',
-                    quantity: 1,
-                    destination: '',
-                    operator: '',
-                    remark: '',
-                    stationId: '',
-                  });
+                  handleAddRecord();
+                  if (preselectedBatchId || returnToBatchId) {
+                    navigate('/parts');
+                  }
                 }}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAddRecord}
                 disabled={
                   !formData.batchId ||
                   !formData.quantity ||
@@ -608,7 +684,7 @@ export default function OutboundRecords() {
                 }
                 className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-teal-600/25"
               >
-                确认出库
+                {returnToBatchId ? '出库并返回详情' : '确认出库'}
               </button>
             </div>
           </div>
